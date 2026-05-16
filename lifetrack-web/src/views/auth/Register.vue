@@ -1,0 +1,125 @@
+<template>
+  <div class="auth-container">
+    <div class="auth-card">
+      <h1 class="auth-title">LifeTrack</h1>
+      <p class="auth-subtitle">创建你的账号</p>
+      <el-form ref="formRef" :model="form" :rules="rules" size="large" @submit.prevent="handleRegister">
+        <el-form-item prop="email">
+          <el-input v-model="form.email" placeholder="邮箱" prefix-icon="Message" />
+        </el-form-item>
+        <el-form-item prop="password">
+          <el-input v-model="form.password" type="password" placeholder="密码（6-32位）" prefix-icon="Lock" show-password />
+        </el-form-item>
+        <el-form-item prop="confirmPassword">
+          <el-input v-model="form.confirmPassword" type="password" placeholder="确认密码" prefix-icon="Lock" show-password />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" native-type="submit" :loading="loading" class="auth-btn">注册</el-button>
+        </el-form-item>
+      </el-form>
+      <div class="auth-link">
+        已有账号？<router-link to="/auth/login">立即登录</router-link>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../../stores/auth'
+import { ElMessage } from 'element-plus'
+
+const router = useRouter()
+const authStore = useAuthStore()
+const formRef = ref()
+const loading = ref(false)
+
+const form = reactive({
+  email: '',
+  password: '',
+  confirmPassword: ''
+})
+
+const validateConfirmPassword = (rule, value, callback) => {
+  if (value !== form.password) {
+    callback(new Error('两次密码不一致'))
+  } else {
+    callback()
+  }
+}
+
+const rules = {
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '邮箱格式不正确', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, max: 32, message: '密码长度6-32位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请确认密码', trigger: 'blur' },
+    { validator: validateConfirmPassword, trigger: 'blur' }
+  ]
+}
+
+async function handleRegister() {
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  loading.value = true
+  try {
+    await authStore.register(form.email, form.password)
+    ElMessage.success('注册成功，请登录')
+    router.push('/auth/login')
+  } catch {}
+  loading.value = false
+}
+</script>
+
+<style scoped>
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.auth-card {
+  width: 400px;
+  padding: 40px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.auth-title {
+  text-align: center;
+  font-size: 28px;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.auth-subtitle {
+  text-align: center;
+  color: #999;
+  margin-bottom: 32px;
+}
+
+.auth-btn {
+  width: 100%;
+}
+
+.auth-link {
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+}
+
+.auth-link a {
+  color: #667eea;
+  text-decoration: none;
+}
+</style>
