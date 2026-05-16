@@ -3,7 +3,9 @@
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <span class="brand-icon">📋</span>
+        <div class="brand-icon-box">
+          <el-icon :size="18" color="#FFF7ED"><List /></el-icon>
+        </div>
         <span class="brand-name">LifeTrack</span>
       </div>
       <nav class="sidebar-nav">
@@ -29,7 +31,7 @@
           <span class="user-avatar">{{ user?.nickname?.charAt(0) || '?' }}</span>
           <span class="user-name">{{ user?.nickname }}</span>
         </div>
-        <el-button text type="danger" size="small" @click="handleLogout">退出</el-button>
+        <button class="logout-btn" @click="handleLogout">退出</button>
       </div>
     </aside>
 
@@ -66,14 +68,15 @@ function handleLogout() {
 .dashboard-layout {
   display: flex;
   min-height: 100vh;
-  background: #f5f6fa;
+  background: #FAFAF8;
+  font-family: 'PingFang SC', 'Helvetica Neue', sans-serif;
 }
 
-/* Sidebar */
+/* ── Sidebar ── */
 .sidebar {
   width: 220px;
-  background: #fff;
-  border-right: 1px solid #edf0f5;
+  background: #FDF6EE;
+  border-right: 1px solid rgba(194, 65, 12, 0.08);
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -84,19 +87,26 @@ function handleLogout() {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 20px;
-  border-bottom: 1px solid #f0f2f5;
+  padding: 20px 18px;
+  border-bottom: 1px solid rgba(194, 65, 12, 0.08);
 }
 
-.brand-icon {
-  font-size: 24px;
+.brand-icon-box {
+  width: 32px;
+  height: 32px;
+  background: #C2410C;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .brand-name {
   font-size: 17px;
-  font-weight: 700;
-  color: #1e293b;
-  letter-spacing: -0.3px;
+  font-weight: 600;
+  color: #1C1917;
+  letter-spacing: -0.02em;
 }
 
 .sidebar-nav {
@@ -112,37 +122,28 @@ function handleLogout() {
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-radius: 8px;
-  color: #64748b;
+  border-radius: 9px;
+  color: #78716C;
   text-decoration: none;
   font-size: 14px;
-  transition: all 0.15s;
+  font-weight: 450;
+  transition: all 0.18s;
 }
 
 .nav-item:hover {
-  background: #f1f5f9;
-  color: #334155;
+  background: rgba(194, 65, 12, 0.06);
+  color: #1C1917;
 }
 
 .nav-item.active {
-  background: #eef2ff;
-  color: #6366f1;
+  background: rgba(194, 65, 12, 0.1);
+  color: #C2410C;
   font-weight: 600;
 }
 
-.nav-item.disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.nav-item.disabled:hover {
-  background: transparent;
-  color: #64748b;
-}
-
 .sidebar-footer {
-  padding: 16px 20px;
-  border-top: 1px solid #f0f2f5;
+  padding: 16px 18px;
+  border-top: 1px solid rgba(194, 65, 12, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -159,8 +160,8 @@ function handleLogout() {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: #6366f1;
-  color: #fff;
+  background: #C2410C;
+  color: #FFF7ED;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -171,15 +172,32 @@ function handleLogout() {
 
 .user-name {
   font-size: 13px;
-  color: #334155;
+  color: #44403C;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Main Content */
+.logout-btn {
+  border: none;
+  background: none;
+  color: #A8A29E;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.logout-btn:hover {
+  color: #DC2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+/* ── Main Content ── */
 .main-content {
   flex: 1;
   overflow-y: auto;
+  background: #FAFAF8;
 }
 </style>
