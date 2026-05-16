@@ -37,8 +37,10 @@ logs/
 # Java
 *.class
 
-# Design documents
+# Documentation (local only)
 *.docx
+PROGRESS.md
+ISSUES.md
 *设计文档*.md
 *设计文档*.docx
 
