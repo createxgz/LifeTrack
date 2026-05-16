@@ -1,10 +1,110 @@
 # LifeTrack 项目进度跟踪
 
-> 最后更新: 2026-05-16 (Phase 5 + 体重编辑 + 趋势范围 + 仪表盘完成)
+> 最后更新: 2026-05-16 (v1.0.0 发布 + GitHub 推送)
+
+## 当前版本
+
+**v1.0.0** — [GitHub: createxgz/LifeTrack](https://github.com/createxgz/LifeTrack)
 
 ## 当前阶段
 
 **Phase 5: 仪表盘 + 数据可视化 — 已完成**
+
+---
+
+## 项目结构
+
+```
+LifeTrack/
+├── .gitignore
+├── PROGRESS.md                          # 项目进度跟踪
+├── ISSUES.md                            # 开发问题记录
+├── LifeTrack 项目工程化设计文档（Agent 开发版）.md
+├── LifeTrack_功能设计文档.docx
+├── lifetrack-server/                    # 后端 Spring Boot 3.3.6 + Java 21
+│   ├── pom.xml
+│   └── src/main/
+│       ├── java/com/lifetrack/
+│       │   ├── LifetrackApplication.java
+│       │   ├── common/
+│       │   │   ├── Result.java          # 统一响应
+│       │   │   └── exception/
+│       │   │       ├── BusinessException.java
+│       │   │       └── GlobalExceptionHandler.java
+│       │   ├── config/                  # 配置 (JWT, Security, MyBatis-Plus, OpenAPI)
+│       │   │   ├── JwtAuthenticationFilter.java
+│       │   │   ├── JwtProperties.java
+│       │   │   ├── JwtUtils.java
+│       │   │   ├── MybatisPlusConfig.java
+│       │   │   ├── OpenApiConfig.java
+│       │   │   └── SecurityConfig.java
+│       │   ├── controller/
+│       │   │   ├── AuthController.java      # /api/auth/*
+│       │   │   ├── TaskController.java      # /api/tasks/*
+│       │   │   ├── HealthController.java    # /api/health/* + /api/foods
+│       │   │   ├── LedgerController.java    # /api/ledger/*
+│       │   │   └── DashboardController.java # /api/dashboard/*
+│       │   ├── dto/                     # 12 个请求 DTO
+│       │   ├── entity/                  # 9 个实体 (User, Task, TaskCheckin, WeightRecord,
+│       │   │   │                       #   DietRecord, Food, LedgerRecord, LedgerCategory, LedgerBudget)
+│       │   ├── mapper/                  # 9 个 MyBatis-Plus Mapper
+│       │   ├── service/
+│       │   │   ├── AuthService.java
+│       │   │   ├── TaskService.java
+│       │   │   ├── HealthService.java
+│       │   │   ├── LedgerService.java
+│       │   │   └── DashboardService.java
+│       │   └── vo/                      # 16 个响应 VO
+│       └── resources/
+│           ├── application.yml          # 数据库 + 服务器配置
+│           └── db/migration/
+│               ├── V1__init_tables.sql  # 11 张表 + 默认数据
+│               └── V2__add_weight_time_slot.sql
+└── lifetrack-web/                       # 前端 Vue 3 + Vite + Element Plus
+    ├── package.json
+    ├── vite.config.js
+    ├── index.html
+    └── src/
+        ├── main.js
+        ├── App.vue
+        ├── style.css
+        ├── api/                         # 5 个 API 模块
+        │   ├── index.js                 # Axios 封装 + JWT 拦截器
+        │   ├── tasks.js
+        │   ├── health.js
+        │   ├── ledger.js
+        │   └── dashboard.js
+        ├── router/index.js              # 路由 (含守卫)
+        ├── stores/                      # Pinia 状态管理
+        │   ├── index.js
+        │   └── auth.js
+        └── views/
+            ├── auth/
+            │   ├── Login.vue
+            │   └── Register.vue
+            ├── dashboard/
+            │   ├── Dashboard.vue        # 侧边栏布局
+            │   └── DashboardHome.vue    # 仪表盘首页
+            ├── tasks/
+            │   ├── TaskList.vue
+            │   └── TaskDetail.vue
+            ├── health/
+            │   └── HealthPage.vue
+            └── ledger/
+                └── LedgerPage.vue
+```
+
+### 统计
+
+| 维度 | 数量 |
+|------|------|
+| 数据库表 | 11 |
+| 后端 Java 类 | 53 (9 entity + 9 mapper + 5 service + 5 controller + 12 dto + 16 vo + 7 config) |
+| REST API 端点 | 28 |
+| Flyway 迁移 | 2 |
+| 前端 Vue 组件 | 8 页面 + 1 布局 |
+| 前端 API 模块 | 5 |
+| ECharts 图表 | 6 (体重趋势/饮食柱状/支出饼/收入饼/周打卡/收支对比) |
 
 ---
 
