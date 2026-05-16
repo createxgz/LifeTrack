@@ -7,10 +7,13 @@
           <el-breadcrumb-item :to="{ path: '/tasks' }">
             <el-icon><List /></el-icon> 任务列表
           </el-breadcrumb-item>
+          <el-breadcrumb-item v-if="task?.parentTaskTitle" :to="{ path: `/tasks/${task.parentTaskId}` }">
+            {{ task.parentTaskTitle }}
+          </el-breadcrumb-item>
           <el-breadcrumb-item>{{ task?.title || '加载中...' }}</el-breadcrumb-item>
         </el-breadcrumb>
         <div class="header-actions">
-          <el-button text type="primary" @click="showEditDialog = true">
+          <el-button text type="primary" @click="openEditDialog">
             <el-icon><Edit /></el-icon> 编辑
           </el-button>
           <el-button text type="danger" @click="handleDelete">
@@ -21,7 +24,7 @@
     </div>
 
     <div v-if="task" class="detail-body">
-      <!-- Hero: streak display -->
+      <!-- Streak display -->
       <div class="streak-hero">
         <div class="streak-main">
           <div class="streak-current">
@@ -42,7 +45,15 @@
       <!-- Task Info Card -->
       <div class="info-card">
         <div class="info-left">
-          <h1 class="task-name">{{ task.title }}</h1>
+          <div class="task-name-row">
+            <span v-if="task.parentTaskId" class="parent-badge">
+              <el-icon :size="13"><Share /></el-icon> 子任务
+            </span>
+            <span v-if="task.subtaskCount > 0" class="children-badge">
+              <el-icon :size="13"><List /></el-icon> {{ task.subtaskCount }} 个子任务
+            </span>
+            <h1 class="task-name">{{ task.title }}</h1>
+          </div>
           <p class="task-desc-text" v-if="task.description">{{ task.description }}</p>
           <div class="task-meta">
             <el-tag :type="repeatTagType(task.repeatType)" effect="light" round size="small">
@@ -74,7 +85,53 @@
         </div>
       </div>
 
-      <!-- Checkin Calendar Placeholder -->
+      <!-- Subtasks Section -->
+      <div v-if="task.subtasks && task.subtasks.length > 0" class="subtasks-section">
+        <div class="section-header">
+          <h3>子任务 ({{ task.subtasks.length }})</h3>
+          <el-button size="small" type="primary" plain @click="showSubtaskDialog = true">
+            <el-icon><Plus /></el-icon> 添加子任务
+          </el-button>
+        </div>
+        <div class="subtask-list">
+          <div
+            v-for="sub in task.subtasks"
+            :key="sub.id"
+            class="subtask-item"
+            @click="router.push(`/tasks/${sub.id}`)"
+          >
+            <div class="subtask-left">
+              <el-icon :size="16"><Share /></el-icon>
+              <span class="subtask-title">{{ sub.title }}</span>
+            </div>
+            <div class="subtask-right">
+              <span class="subtask-streak" :class="{ active: sub.streakDays > 0 }">
+                🔥 {{ sub.streakDays }}天
+              </span>
+              <el-tag
+                size="small"
+                :type="sub.checkedToday ? 'success' : 'info'"
+                effect="light"
+              >
+                {{ sub.checkedToday ? '已打卡' : '未打卡' }}
+              </el-tag>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subtask placeholder (for parent tasks without subtasks yet) -->
+      <div v-else-if="!task.parentTaskId" class="subtasks-section">
+        <div class="section-header">
+          <h3>子任务</h3>
+          <el-button size="small" type="primary" plain @click="showSubtaskDialog = true">
+            <el-icon><Plus /></el-icon> 添加子任务
+          </el-button>
+        </div>
+        <el-empty description="暂无子任务，为大任务拆解具体步骤" :image-size="60" />
+      </div>
+
+      <!-- Checkin Calendar -->
       <div class="calendar-section">
         <div class="section-header">
           <h3>打卡日历</h3>
@@ -136,8 +193,18 @@
     </div>
 
     <!-- Edit Dialog -->
-    <el-dialog v-model="showEditDialog" title="编辑任务" width="480px" destroy-on-close>
+    <el-dialog v-model="showEditDialog" title="编辑任务" width="500px" destroy-on-close>
       <el-form ref="editFormRef" :model="editForm" label-position="top">
+        <el-form-item label="父任务" v-if="parentTasks.length > 0 || editForm.parentTaskId">
+          <el-select v-model="editForm.parentTaskId" placeholder="无（顶层任务）" clearable style="width: 100%">
+            <el-option
+              v-for="pt in parentTasks"
+              :key="pt.id"
+              :label="pt.title"
+              :value="pt.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="任务名称" prop="title">
           <el-input v-model="editForm.title" />
         </el-form-item>
@@ -200,6 +267,51 @@
         <el-button type="primary" @click="handleCheckin" :loading="checkingIn">确认打卡</el-button>
       </template>
     </el-dialog>
+
+    <!-- Add Subtask Dialog -->
+    <el-dialog v-model="showSubtaskDialog" title="添加子任务" width="480px" destroy-on-close>
+      <el-form ref="subtaskFormRef" :model="subtaskForm" :rules="subtaskRules" label-position="top">
+        <el-form-item label="子任务名称" prop="title">
+          <el-input v-model="subtaskForm.title" placeholder="例如：阅读第3章" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="subtaskForm.description" type="textarea" :rows="2" placeholder="可选" />
+        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="重复类型" prop="repeatType">
+              <el-select v-model="subtaskForm.repeatType" style="width: 100%">
+                <el-option label="一次性" :value="0" />
+                <el-option label="每日" :value="1" />
+                <el-option label="每周" :value="2" />
+                <el-option label="每月" :value="3" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="提醒时间">
+              <el-time-picker v-model="subtaskForm.remindTime" format="HH:mm" value-format="HH:mm:ss" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="开始日期" prop="startDate">
+              <el-date-picker v-model="subtaskForm.startDate" type="date" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="结束日期">
+              <el-date-picker v-model="subtaskForm.endDate" type="date" style="width: 100%" placeholder="永久" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button @click="showSubtaskDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleCreateSubtask" :loading="creatingSubtask">添加</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -208,7 +320,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  List, Edit, Delete, Calendar, AlarmClock, CirclePlus, CircleCheck
+  List, Edit, Delete, Calendar, AlarmClock, CirclePlus, CircleCheck, Share, Plus
 } from '@element-plus/icons-vue'
 import { taskApi } from '@/api/tasks'
 
@@ -219,14 +331,27 @@ const task = ref(null)
 const records = ref([])
 const showEditDialog = ref(false)
 const showCheckinDialog = ref(false)
+const showSubtaskDialog = ref(false)
 const updating = ref(false)
 const checkingIn = ref(false)
+const creatingSubtask = ref(false)
+const parentTasks = ref([])
+const subtaskFormRef = ref(null)
 
 const editForm = reactive({
-  title: '', description: '', repeatType: 1, remindTime: null, startDate: '', endDate: null, status: 1
+  title: '', description: '', parentTaskId: null, repeatType: 1, remindTime: null, startDate: '', endDate: null, status: 1
 })
 
 const checkinForm = reactive({ date: new Date(), note: '' })
+
+const subtaskForm = reactive({
+  title: '', description: '', repeatType: 1, remindTime: null, startDate: '', endDate: null
+})
+
+const subtaskRules = {
+  title: [{ required: true, message: '请输入子任务名称', trigger: 'blur' }],
+  startDate: [{ required: true, message: '请选择开始日期', trigger: 'change' }]
+}
 
 const repeatLabel = (type) => ({ 0: '一次性', 1: '每日', 2: '每周', 3: '每月' })[type] || '未知'
 const repeatTagType = (type) => ({ 0: 'info', 1: '', 2: 'warning', 3: 'danger' })[type] || 'info'
@@ -270,6 +395,7 @@ const loadTask = async () => {
   Object.assign(editForm, {
     title: task.value.title,
     description: task.value.description || '',
+    parentTaskId: task.value.parentTaskId || null,
     repeatType: task.value.repeatType,
     remindTime: task.value.remindTime,
     startDate: task.value.startDate,
@@ -281,6 +407,16 @@ const loadTask = async () => {
 const loadRecords = async () => {
   const res = await taskApi.records(route.params.id)
   records.value = res.data
+}
+
+const loadParentTasks = async () => {
+  const res = await taskApi.list({ parentTaskId: 0, page: 1, size: 50 })
+  parentTasks.value = (res.data.records || []).filter(t => t.id !== task.value?.id)
+}
+
+const openEditDialog = async () => {
+  await loadParentTasks()
+  showEditDialog.value = true
 }
 
 const toggleStatus = async (val) => {
@@ -308,7 +444,13 @@ const handleUpdate = async () => {
 }
 
 const handleDelete = async () => {
-  await ElMessageBox.confirm('确定要删除这个任务吗？', '确认删除', {
+  const warnings = []
+  if (task.value.subtaskCount > 0) {
+    warnings.push(`该任务下有 ${task.value.subtaskCount} 个子任务，将一并删除`)
+  }
+  const msg = warnings.length > 0 ? warnings[0] : '确定要删除这个任务吗？'
+
+  await ElMessageBox.confirm(msg, '确认删除', {
     confirmButtonText: '删除',
     cancelButtonText: '取消',
     type: 'warning'
@@ -335,6 +477,34 @@ const handleCheckin = async () => {
     // handled
   } finally {
     checkingIn.value = false
+  }
+}
+
+const handleCreateSubtask = async () => {
+  const valid = await subtaskFormRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  creatingSubtask.value = true
+  try {
+    await taskApi.create({
+      title: subtaskForm.title,
+      description: subtaskForm.description,
+      parentTaskId: task.value.id,
+      repeatType: subtaskForm.repeatType,
+      remindTime: subtaskForm.remindTime,
+      startDate: subtaskForm.startDate,
+      endDate: subtaskForm.endDate
+    })
+    ElMessage.success('子任务已创建')
+    showSubtaskDialog.value = false
+    Object.assign(subtaskForm, {
+      title: '', description: '', repeatType: 1, remindTime: null, startDate: '', endDate: null
+    })
+    await loadTask()
+  } catch (e) {
+    // handled
+  } finally {
+    creatingSubtask.value = false
   }
 }
 
@@ -456,11 +626,41 @@ onMounted(() => {
   box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
 }
 
+.task-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.parent-badge {
+  font-size: 11px;
+  color: #818cf8;
+  background: #eef2ff;
+  padding: 2px 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.children-badge {
+  font-size: 11px;
+  color: #6366f1;
+  background: #e0e7ff;
+  padding: 2px 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
 .task-name {
   font-size: 20px;
   font-weight: 700;
   color: #1e293b;
-  margin: 0 0 6px;
+  margin: 0;
 }
 
 .task-desc-text {
@@ -495,6 +695,67 @@ onMounted(() => {
 .status-label {
   font-size: 13px;
   color: #94a3b8;
+}
+
+/* Subtasks Section */
+.subtasks-section {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+}
+
+.subtask-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.subtask-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  border: 1px solid transparent;
+}
+
+.subtask-item:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  transform: translateX(4px);
+}
+
+.subtask-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #818cf8;
+}
+
+.subtask-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.subtask-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.subtask-streak {
+  font-size: 12px;
+  color: #c0c4cc;
+}
+
+.subtask-streak.active {
+  color: #f59e0b;
 }
 
 /* Section Header */

@@ -14,6 +14,7 @@ public class Task {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long parentTaskId;
     private Long userId;
     private String title;
     private String description;

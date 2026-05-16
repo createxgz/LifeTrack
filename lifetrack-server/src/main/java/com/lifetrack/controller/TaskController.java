@@ -57,11 +57,12 @@ public class TaskController {
     public Result<Map<String, Object>> list(
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) Integer repeatType,
+            @RequestParam(required = false) Long parentTaskId,
             @RequestParam(required = false, defaultValue = "1") Integer page,
             @RequestParam(required = false, defaultValue = "10") Integer size,
             Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        return Result.success(taskService.getTasks(userId, status, repeatType, page, size));
+        return Result.success(taskService.getTasks(userId, status, repeatType, parentTaskId, page, size));
     }
 
     @Operation(summary = "任务详情")

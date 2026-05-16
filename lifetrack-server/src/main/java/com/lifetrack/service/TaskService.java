@@ -31,8 +31,17 @@ public class TaskService {
     private final TaskCheckinMapper checkinMapper;
 
     public TaskVO createTask(Long userId, CreateTaskDTO dto) {
+        // Validate parent task if specified
+        if (dto.getParentTaskId() != null) {
+            Task parent = getOwnedTask(userId, dto.getParentTaskId());
+            if (parent.getParentTaskId() != null) {
+                throw new BusinessException("子任务不能再创建子任务");
+            }
+        }
+
         Task task = new Task();
         task.setUserId(userId);
+        task.setParentTaskId(dto.getParentTaskId());
         task.setTitle(dto.getTitle());
         task.setDescription(dto.getDescription());
         task.setRepeatType(dto.getRepeatType());
@@ -47,6 +56,24 @@ public class TaskService {
 
     public TaskVO updateTask(Long userId, Long taskId, UpdateTaskDTO dto) {
         Task task = getOwnedTask(userId, taskId);
+
+        if (dto.getParentTaskId() != null) {
+            // Prevent self-referencing
+            if (dto.getParentTaskId().equals(taskId)) {
+                throw new BusinessException("不能将自身设为父任务");
+            }
+            // Validate new parent exists and belongs to user
+            Task newParent = getOwnedTask(userId, dto.getParentTaskId());
+            if (newParent.getParentTaskId() != null) {
+                throw new BusinessException("子任务不能作为父任务");
+            }
+            // Prevent deep nesting
+            if (dto.getParentTaskId().equals(task.getParentTaskId())) {
+                // setting same parent, skip validation
+            }
+            task.setParentTaskId(dto.getParentTaskId());
+        }
+
         if (dto.getTitle() != null) task.setTitle(dto.getTitle());
         if (dto.getDescription() != null) task.setDescription(dto.getDescription());
         if (dto.getRepeatType() != null) task.setRepeatType(dto.getRepeatType());
@@ -59,23 +86,41 @@ public class TaskService {
         return toVO(task, userId);
     }
 
+    @Transactional
     public void deleteTask(Long userId, Long taskId) {
-        getOwnedTask(userId, taskId);
+        Task task = getOwnedTask(userId, taskId);
+
+        // Soft-delete all subtasks first
+        List<Task> subtasks = taskMapper.selectList(
+                new LambdaQueryWrapper<Task>()
+                        .eq(Task::getParentTaskId, taskId));
+        for (Task sub : subtasks) {
+            taskMapper.deleteById(sub.getId());
+        }
+
         taskMapper.deleteById(taskId);
     }
 
-    public Map<String, Object> getTasks(Long userId, Integer status, Integer repeatType, Integer page, Integer size) {
+    public Map<String, Object> getTasks(Long userId, Integer status, Integer repeatType,
+                                        Long parentTaskId, Integer page, Integer size) {
         LambdaQueryWrapper<Task> wrapper = new LambdaQueryWrapper<Task>()
                 .eq(Task::getUserId, userId)
                 .orderByDesc(Task::getCreatedAt);
 
         if (status != null) wrapper.eq(Task::getStatus, status);
         if (repeatType != null) wrapper.eq(Task::getRepeatType, repeatType);
+        if (parentTaskId != null) {
+            if (parentTaskId == 0) {
+                // 0 means top-level tasks only
+                wrapper.isNull(Task::getParentTaskId);
+            } else {
+                wrapper.eq(Task::getParentTaskId, parentTaskId);
+            }
+        }
 
         Page<Task> pageResult = taskMapper.selectPage(
                 new Page<>(page != null ? page : 1, size != null ? size : 10), wrapper);
 
-        LocalDate today = LocalDate.now();
         List<TaskVO> vos = pageResult.getRecords().stream()
                 .map(t -> toVO(t, userId))
                 .collect(Collectors.toList());
@@ -90,7 +135,29 @@ public class TaskService {
 
     public TaskVO getTaskDetail(Long userId, Long taskId) {
         Task task = getOwnedTask(userId, taskId);
-        return toVO(task, userId);
+        TaskVO vo = toVO(task, userId);
+
+        // Include parent task title if this is a subtask
+        if (task.getParentTaskId() != null) {
+            Task parent = taskMapper.selectById(task.getParentTaskId());
+            if (parent != null) {
+                vo.setParentTaskTitle(parent.getTitle());
+            }
+        }
+
+        // Include subtasks in detail view
+        List<Task> subtasks = taskMapper.selectList(
+                new LambdaQueryWrapper<Task>()
+                        .eq(Task::getParentTaskId, taskId)
+                        .eq(Task::getUserId, userId)
+                        .orderByDesc(Task::getCreatedAt));
+        if (!subtasks.isEmpty()) {
+            vo.setSubtasks(subtasks.stream()
+                    .map(t -> toVO(t, userId))
+                    .collect(Collectors.toList()));
+        }
+
+        return vo;
     }
 
     @Transactional
@@ -99,18 +166,15 @@ public class TaskService {
 
         LocalDate checkinDate = targetDate != null ? targetDate : LocalDate.now();
 
-        // 不允许未来打卡
         if (checkinDate.isAfter(LocalDate.now())) {
             throw new BusinessException("不能提前打卡");
         }
 
-        // 补签限制：3天内
         long daysDiff = ChronoUnit.DAYS.between(checkinDate, LocalDate.now());
         if (daysDiff > 3) {
             throw new BusinessException("仅支持3天内补签");
         }
 
-        // 检查任务是否在有效期内
         if (checkinDate.isBefore(task.getStartDate())) {
             throw new BusinessException("该日期任务尚未开始");
         }
@@ -118,7 +182,6 @@ public class TaskService {
             throw new BusinessException("该日期任务已结束");
         }
 
-        // 检查是否已打卡
         TaskCheckin existing = checkinMapper.selectOne(new LambdaQueryWrapper<TaskCheckin>()
                 .eq(TaskCheckin::getTaskId, taskId)
                 .eq(TaskCheckin::getCheckinDate, checkinDate));
@@ -126,7 +189,6 @@ public class TaskService {
             throw new BusinessException("该日期已打卡");
         }
 
-        // 创建打卡记录
         TaskCheckin checkin = new TaskCheckin();
         checkin.setTaskId(taskId);
         checkin.setUserId(userId);
@@ -134,7 +196,6 @@ public class TaskService {
         checkin.setNote(note);
         checkinMapper.insert(checkin);
 
-        // 重新计算连续天数
         updateStreak(task);
     }
 
@@ -161,7 +222,7 @@ public class TaskService {
         LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate monthStart = today.withDayOfMonth(1);
 
-        // All active tasks
+        // All active tasks (including subtasks)
         List<Task> allTasks = taskMapper.selectList(
                 new LambdaQueryWrapper<Task>()
                         .eq(Task::getUserId, userId)
@@ -255,6 +316,7 @@ public class TaskService {
     private TaskVO toVO(Task task, Long userId) {
         TaskVO vo = new TaskVO();
         vo.setId(task.getId());
+        vo.setParentTaskId(task.getParentTaskId());
         vo.setUserId(task.getUserId());
         vo.setTitle(task.getTitle());
         vo.setDescription(task.getDescription());
@@ -267,6 +329,12 @@ public class TaskService {
         vo.setStreakDays(task.getStreakDays());
         vo.setMaxStreakDays(task.getMaxStreakDays());
         vo.setCreatedAt(task.getCreatedAt());
+
+        // Count subtasks
+        Long subtaskCount = taskMapper.selectCount(
+                new LambdaQueryWrapper<Task>()
+                        .eq(Task::getParentTaskId, task.getId()));
+        vo.setSubtaskCount(subtaskCount.intValue());
 
         // Check if checked in today
         TaskCheckin todayCheckin = checkinMapper.selectOne(

@@ -26,4 +26,6 @@ public class CreateTaskDTO {
     private LocalDate startDate;
 
     private LocalDate endDate;
+
+    private Long parentTaskId;
 }

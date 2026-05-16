@@ -54,8 +54,12 @@
           <el-option label="每月" :value="3" />
           <el-option label="一次性" :value="0" />
         </el-select>
+        <el-select v-model="filterParent" placeholder="全部层级" size="default" @change="loadTasks">
+          <el-option label="全部任务" :value="null" />
+          <el-option label="仅顶层任务" :value="0" />
+        </el-select>
       </div>
-      <el-button type="primary" @click="showCreateDialog = true">
+      <el-button type="primary" @click="openCreateDialog(null)">
         <el-icon><Plus /></el-icon>
         新建任务
       </el-button>
@@ -67,11 +71,14 @@
         v-for="task in tasks"
         :key="task.id"
         class="task-card"
-        :class="{ 'checked-today': task.checkedToday }"
+        :class="{ 'checked-today': task.checkedToday, 'is-subtask': task.parentTaskId }"
         @click="goDetail(task.id)"
       >
         <div class="task-card-top">
           <div class="task-title-row">
+            <span v-if="task.parentTaskId" class="sub-indicator">
+              <el-icon :size="14"><Share /></el-icon>
+            </span>
             <h3 class="task-title">{{ task.title }}</h3>
             <el-tag
               size="small"
@@ -118,6 +125,17 @@
           <el-tag v-else type="success" effect="dark" round size="small">已打卡</el-tag>
         </div>
 
+        <!-- Subtask count badge -->
+        <div v-if="task.subtaskCount > 0" class="subtask-badge" @click.stop="goDetail(task.id)">
+          <el-icon :size="12"><List /></el-icon>
+          {{ task.subtaskCount }} 个子任务
+        </div>
+
+        <!-- Add subtask quick action -->
+        <div v-if="!task.parentTaskId" class="add-subtask-btn" @click.stop="openCreateDialog(task.id)">
+          <el-icon :size="14"><Plus /></el-icon>
+        </div>
+
         <!-- Status Indicator Dot -->
         <div class="status-dot" :class="statusClass(task.status)"></div>
       </div>
@@ -137,9 +155,19 @@
       />
     </div>
 
-    <!-- Create Task Dialog -->
-    <el-dialog v-model="showCreateDialog" title="新建任务" width="480px" destroy-on-close>
+    <!-- Create / Edit Task Dialog -->
+    <el-dialog v-model="showCreateDialog" :title="isEditMode ? '编辑任务' : '新建任务'" width="500px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+        <el-form-item label="父任务" v-if="parentTasks.length > 0 || form.parentTaskId">
+          <el-select v-model="form.parentTaskId" placeholder="无（顶层任务）" clearable style="width: 100%">
+            <el-option
+              v-for="pt in parentTasks"
+              :key="pt.id"
+              :label="pt.title"
+              :value="pt.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="任务名称" prop="title">
           <el-input v-model="form.title" placeholder="例如：每天阅读30分钟" />
         </el-form-item>
@@ -184,7 +212,9 @@
       </el-form>
       <template #footer>
         <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleCreate" :loading="creating">创建任务</el-button>
+        <el-button type="primary" @click="handleSubmit" :loading="saving">
+          {{ isEditMode ? '保存修改' : '创建任务' }}
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -194,7 +224,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { List, CircleCheck, TrendCharts, Timer, Plus } from '@element-plus/icons-vue'
+import { List, CircleCheck, TrendCharts, Timer, Plus, Share } from '@element-plus/icons-vue'
 import { taskApi } from '@/api/tasks'
 
 const router = useRouter()
@@ -205,10 +235,13 @@ const currentPage = ref(1)
 const pageSize = 12
 const filterStatus = ref(null)
 const filterRepeat = ref(null)
+const filterParent = ref(null)
 const checkingIn = ref(null)
-const creating = ref(false)
+const saving = ref(false)
 const showCreateDialog = ref(false)
 const formRef = ref(null)
+const editTaskId = ref(null)
+const parentTasks = ref([])
 
 const stats = reactive({
   totalTasks: 0,
@@ -217,6 +250,8 @@ const stats = reactive({
   weekRate: 0,
   monthRate: 0
 })
+
+const isEditMode = computed(() => editTaskId.value !== null)
 
 const maxStreak = computed(() => {
   let max = 0
@@ -227,6 +262,7 @@ const maxStreak = computed(() => {
 const form = reactive({
   title: '',
   description: '',
+  parentTaskId: null,
   repeatType: 1,
   remindTime: null,
   startDate: '',
@@ -258,6 +294,7 @@ const loadTasks = async () => {
   const res = await taskApi.list({
     status: filterStatus.value,
     repeatType: filterRepeat.value,
+    parentTaskId: filterParent.value,
     page: currentPage.value,
     size: pageSize
   })
@@ -268,6 +305,42 @@ const loadTasks = async () => {
 const loadStats = async () => {
   const res = await taskApi.stats()
   Object.assign(stats, res.data)
+}
+
+const loadParentTasks = async () => {
+  // Fetch top-level tasks for parent selector (up to 50)
+  const res = await taskApi.list({ parentTaskId: 0, page: 1, size: 50 })
+  parentTasks.value = res.data.records || []
+}
+
+const openCreateDialog = (parentTaskId) => {
+  editTaskId.value = null
+  Object.assign(form, {
+    title: '',
+    description: '',
+    parentTaskId: parentTaskId || null,
+    repeatType: 1,
+    remindTime: null,
+    startDate: '',
+    endDate: null
+  })
+  showCreateDialog.value = true
+  loadParentTasks()
+}
+
+const openEditDialog = async (task) => {
+  editTaskId.value = task.id
+  loadParentTasks()
+  Object.assign(form, {
+    title: task.title,
+    description: task.description || '',
+    parentTaskId: task.parentTaskId || null,
+    repeatType: task.repeatType,
+    remindTime: task.remindTime,
+    startDate: task.startDate,
+    endDate: task.endDate
+  })
+  showCreateDialog.value = true
 }
 
 const quickCheckin = async (task) => {
@@ -284,31 +357,46 @@ const quickCheckin = async (task) => {
   }
 }
 
-const handleCreate = async () => {
+const handleSubmit = async () => {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
 
-  creating.value = true
+  saving.value = true
   try {
-    await taskApi.create({
-      title: form.title,
-      description: form.description,
-      repeatType: form.repeatType,
-      remindTime: form.remindTime,
-      startDate: form.startDate,
-      endDate: form.endDate
-    })
-    ElMessage.success('任务已创建')
+    if (isEditMode.value) {
+      await taskApi.update(editTaskId.value, {
+        title: form.title,
+        description: form.description,
+        parentTaskId: form.parentTaskId,
+        repeatType: form.repeatType,
+        remindTime: form.remindTime,
+        startDate: form.startDate,
+        endDate: form.endDate
+      })
+      ElMessage.success('任务已更新')
+    } else {
+      await taskApi.create({
+        title: form.title,
+        description: form.description,
+        parentTaskId: form.parentTaskId,
+        repeatType: form.repeatType,
+        remindTime: form.remindTime,
+        startDate: form.startDate,
+        endDate: form.endDate
+      })
+      ElMessage.success('任务已创建')
+    }
     showCreateDialog.value = false
     Object.assign(form, {
-      title: '', description: '', repeatType: 1, remindTime: null, startDate: '', endDate: null
+      title: '', description: '', parentTaskId: null, repeatType: 1, remindTime: null, startDate: '', endDate: null
     })
+    editTaskId.value = null
     await loadTasks()
     await loadStats()
   } catch (e) {
     // error handled by interceptor
   } finally {
-    creating.value = false
+    saving.value = false
   }
 }
 
@@ -451,6 +539,11 @@ onMounted(() => {
   border-color: #e2e8f0;
 }
 
+.task-card.is-subtask {
+  border-left: 3px solid #818cf8;
+  padding-left: 17px;
+}
+
 .task-card.checked-today {
   background: linear-gradient(135deg, #fafffe 0%, #f0fdf4 100%);
 }
@@ -464,6 +557,13 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
+}
+
+.sub-indicator {
+  color: #818cf8;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .task-title {
@@ -526,6 +626,53 @@ onMounted(() => {
 
 .checkin-btn {
   font-weight: 600;
+}
+
+/* Subtask badge */
+.subtask-badge {
+  position: absolute;
+  bottom: 10px;
+  left: 20px;
+  font-size: 11px;
+  color: #818cf8;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  background: #eef2ff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.subtask-badge:hover {
+  background: #e0e7ff;
+}
+
+/* Add subtask button */
+.add-subtask-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 20px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #eef2ff;
+  color: #818cf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.task-card:hover .add-subtask-btn {
+  opacity: 1;
+}
+
+.add-subtask-btn:hover {
+  background: #c7d2fe;
 }
 
 /* Status Dot */

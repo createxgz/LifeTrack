@@ -16,4 +16,5 @@ public class UpdateTaskDTO {
     private LocalDate startDate;
     private LocalDate endDate;
     private Integer status;
+    private Long parentTaskId;
 }
