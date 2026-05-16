@@ -217,10 +217,24 @@
               <span class="finance-val" :class="{ negative: balanceNegative }">{{ balanceStr }}</span>
             </div>
           </div>
-          <!-- 预算占位 -->
-          <div class="budget-placeholder">
-            <el-icon :size="13"><WarningFilled /></el-icon>
-            <span>预算功能开发中</span>
+          <!-- 预算 -->
+          <div v-if="overview.monthlyBudget > 0" class="budget-section">
+            <div class="budget-bar-header">
+              <span>预算</span>
+              <span :class="budgetOver ? 'over' : ''">{{ budgetUsagePct }}%</span>
+            </div>
+            <div class="budget-bar-wrap">
+              <div class="budget-bar-fill" :style="{ width: Math.min(budgetUsagePct, 100) + '%', background: budgetOver ? '#DC2626' : budgetUsagePct > 80 ? '#F59E0B' : '#0F766E' }"></div>
+            </div>
+            <div class="budget-amounts">
+              <span>已花 ¥{{ fmtNum(overview.monthlyExpense || 0) }}</span>
+              <span>{{ budgetOver ? '超支 ¥' : '剩 ¥' }}{{ fmtBudgetRemain }}</span>
+            </div>
+          </div>
+          <div v-else class="budget-placeholder">
+            <el-icon :size="13"><InfoFilled /></el-icon>
+            <span>未设置预算</span>
+            <router-link to="/ledger" class="budget-link">去设置 →</router-link>
           </div>
         </div>
 
@@ -259,7 +273,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { List, Histogram, KnifeFork, Money, Check, WarningFilled } from '@element-plus/icons-vue'
+import { List, Histogram, KnifeFork, Money, Check, InfoFilled } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { dashboardApi } from '@/api/dashboard'
 import { taskApi } from '@/api/tasks'
@@ -336,6 +350,14 @@ const calorieRemaining = computed(() => {
 const calorieDash = computed(() => {
   const len = 2 * Math.PI * 38
   return `${len * caloriePct.value / 100} ${len}`
+})
+
+// 预算
+const budgetUsagePct = computed(() => Math.round(Number(overview.budgetUsagePercent || 0)))
+const budgetOver = computed(() => Number(overview.budgetUsagePercent || 0) > 100)
+const fmtBudgetRemain = computed(() => {
+  const v = Math.abs(Number(overview.budgetRemaining || 0))
+  return v % 1 === 0 ? v.toLocaleString('zh-CN') : v.toFixed(1)
 })
 
 // 餐次标签（占位，等后端提供具体餐次数据）
@@ -1005,6 +1027,45 @@ onUnmounted(() => {
   padding: 8px 12px;
   background: #F5F0EB;
   border-radius: 8px;
+  font-size: 11px;
+  color: #A8A29E;
+}
+.budget-link {
+  font-size: 11px;
+  color: #C2410C;
+  text-decoration: none;
+  font-weight: 500;
+}
+.budget-link:hover { text-decoration: underline; }
+
+/* Budget Section */
+.budget-section {
+  margin-top: 12px;
+}
+.budget-bar-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #78716C;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+.budget-bar-header .over { color: #DC2626; }
+.budget-bar-wrap {
+  height: 6px;
+  background: #F3F4F6;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.budget-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.budget-amounts {
+  display: flex;
+  justify-content: space-between;
   font-size: 11px;
   color: #A8A29E;
 }

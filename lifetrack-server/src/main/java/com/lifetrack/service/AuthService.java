@@ -32,7 +32,7 @@ public class AuthService {
         User user = new User();
         user.setEmail(dto.getEmail());
         user.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
-        user.setNickname(dto.getEmail().split("@")[0]);
+        user.setNickname(dto.getNickname() != null ? dto.getNickname() : dto.getEmail().split("@")[0]);
         userMapper.insert(user);
     }
 

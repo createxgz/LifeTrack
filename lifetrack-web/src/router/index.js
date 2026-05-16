@@ -37,13 +37,13 @@ const routes = [
   {
     path: '/auth/login',
     name: 'Login',
-    component: () => import('../views/auth/Login.vue'),
+    component: () => import('../views/auth/AuthPage.vue'),
     meta: { guest: true }
   },
   {
     path: '/auth/register',
     name: 'Register',
-    component: () => import('../views/auth/Register.vue'),
+    component: () => import('../views/auth/AuthPage.vue'),
     meta: { guest: true }
   }
 ]
@@ -54,7 +54,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token')
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token')
   if (to.meta.requiresAuth && !token) {
     next('/auth/login')
   } else if (to.meta.guest && token) {

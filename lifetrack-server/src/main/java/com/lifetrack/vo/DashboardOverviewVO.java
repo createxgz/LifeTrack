@@ -28,4 +28,7 @@ public class DashboardOverviewVO {
     private BigDecimal monthlyIncome;
     private BigDecimal monthlyExpense;
     private BigDecimal balance;
+    private BigDecimal monthlyBudget;
+    private BigDecimal budgetRemaining;
+    private BigDecimal budgetUsagePercent;
 }

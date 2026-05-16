@@ -3,28 +3,38 @@ import { ref } from 'vue'
 import { authApi, userApi } from '../api'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(localStorage.getItem('token') || '')
+  const token = ref(localStorage.getItem('token') || sessionStorage.getItem('token') || '')
   const user = ref(null)
 
-  function setToken(newToken) {
+  function setToken(newToken, remember) {
     token.value = newToken
-    localStorage.setItem('token', newToken)
+    if (remember === false) {
+      sessionStorage.setItem('token', newToken)
+      localStorage.removeItem('token')
+    } else {
+      localStorage.setItem('token', newToken)
+      sessionStorage.removeItem('token')
+    }
+  }
+
+  function setUserInfo(userInfo) {
+    user.value = userInfo
   }
 
   function logout() {
     token.value = ''
     user.value = null
     localStorage.removeItem('token')
+    sessionStorage.removeItem('token')
   }
 
   async function login(email, password) {
     const res = await authApi.login({ email, password })
-    setToken(res.data.token)
     return res.data
   }
 
-  async function register(email, password) {
-    return await authApi.register({ email, password })
+  async function register(email, password, nickname) {
+    return await authApi.register({ email, password, nickname })
   }
 
   async function fetchProfile() {
@@ -33,5 +43,5 @@ export const useAuthStore = defineStore('auth', () => {
     return res.data
   }
 
-  return { token, user, setToken, logout, login, register, fetchProfile }
+  return { token, user, setToken, setUserInfo, logout, login, register, fetchProfile }
 })

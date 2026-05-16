@@ -3,14 +3,26 @@ package com.lifetrack.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.lifetrack.common.exception.BusinessException;
+import com.lifetrack.dto.CreateBudgetDTO;
 import com.lifetrack.dto.CreateLedgerRecordDTO;
+import com.lifetrack.dto.UpdateBudgetDTO;
 import com.lifetrack.dto.UpdateLedgerRecordDTO;
+import com.lifetrack.dto.CreateCategoryDTO;
+import com.lifetrack.dto.CreateWalletAccountDTO;
+import com.lifetrack.dto.UpdateCategoryDTO;
+import com.lifetrack.dto.UpdateWalletAccountDTO;
+import com.lifetrack.entity.LedgerBudget;
 import com.lifetrack.entity.LedgerCategory;
 import com.lifetrack.entity.LedgerRecord;
+import com.lifetrack.entity.WalletAccount;
+import com.lifetrack.mapper.LedgerBudgetMapper;
 import com.lifetrack.mapper.LedgerCategoryMapper;
 import com.lifetrack.mapper.LedgerRecordMapper;
+import com.lifetrack.mapper.WalletAccountMapper;
+import com.lifetrack.vo.BudgetVO;
 import com.lifetrack.vo.LedgerRecordVO;
 import com.lifetrack.vo.LedgerStatsVO;
+import com.lifetrack.vo.WalletVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +38,8 @@ public class LedgerService {
 
     private final LedgerRecordMapper ledgerRecordMapper;
     private final LedgerCategoryMapper ledgerCategoryMapper;
+    private final WalletAccountMapper walletAccountMapper;
+    private final LedgerBudgetMapper ledgerBudgetMapper;
 
     // ========== 收支记录 CRUD ==========
 
@@ -187,6 +201,253 @@ public class LedgerService {
             sb.append(escapeCSV(r.getNote() != null ? r.getNote() : "")).append("\n");
         }
         return sb.toString();
+    }
+
+    // ========== 钱包账户 CRUD ==========
+
+    public WalletVO getWallets(Long userId) {
+        List<WalletAccount> accounts = walletAccountMapper.selectList(
+                new LambdaQueryWrapper<WalletAccount>()
+                        .eq(WalletAccount::getUserId, userId)
+                        .orderByAsc(WalletAccount::getSortOrder)
+                        .orderByAsc(WalletAccount::getId));
+
+        BigDecimal total = accounts.stream()
+                .map(WalletAccount::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        WalletVO vo = new WalletVO();
+        vo.setTotal(total);
+        vo.setAccounts(accounts);
+        return vo;
+    }
+
+    public WalletAccount addWallet(Long userId, CreateWalletAccountDTO dto) {
+        WalletAccount account = new WalletAccount();
+        account.setUserId(userId);
+        account.setName(dto.getName());
+        account.setAmount(dto.getAmount());
+        account.setAccountType(dto.getAccountType());
+        account.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
+        walletAccountMapper.insert(account);
+        return account;
+    }
+
+    public WalletAccount updateWallet(Long userId, Long id, UpdateWalletAccountDTO dto) {
+        WalletAccount account = walletAccountMapper.selectById(id);
+        if (account == null || !account.getUserId().equals(userId)) {
+            throw new BusinessException(404, "钱包账户不存在");
+        }
+        if (dto.getName() != null) account.setName(dto.getName());
+        if (dto.getAmount() != null) account.setAmount(dto.getAmount());
+        if (dto.getAccountType() != null) account.setAccountType(dto.getAccountType());
+        if (dto.getSortOrder() != null) account.setSortOrder(dto.getSortOrder());
+        walletAccountMapper.updateById(account);
+        return account;
+    }
+
+    public void deleteWallet(Long userId, Long id) {
+        WalletAccount account = walletAccountMapper.selectById(id);
+        if (account == null || !account.getUserId().equals(userId)) {
+            throw new BusinessException(404, "钱包账户不存在");
+        }
+        walletAccountMapper.deleteById(id);
+    }
+
+    // ========== 自定义分类 CRUD ==========
+
+    public LedgerCategory addCategory(Long userId, CreateCategoryDTO dto) {
+        LedgerCategory cat = new LedgerCategory();
+        cat.setUserId(userId);
+        cat.setName(dto.getName());
+        cat.setType(dto.getType());
+        cat.setIcon(dto.getIcon());
+        cat.setColor(dto.getColor());
+        cat.setIsDefault(0);
+        ledgerCategoryMapper.insert(cat);
+        return cat;
+    }
+
+    public LedgerCategory updateCategory(Long userId, Long id, UpdateCategoryDTO dto) {
+        LedgerCategory cat = ledgerCategoryMapper.selectById(id);
+        if (cat == null) {
+            throw new BusinessException(404, "分类不存在");
+        }
+        if (cat.getIsDefault() != null && cat.getIsDefault() == 1) {
+            throw new BusinessException(403, "系统默认分类不可修改");
+        }
+        if (!userId.equals(cat.getUserId())) {
+            throw new BusinessException(403, "只能修改自己的分类");
+        }
+        if (dto.getName() != null) cat.setName(dto.getName());
+        if (dto.getIcon() != null) cat.setIcon(dto.getIcon());
+        if (dto.getColor() != null) cat.setColor(dto.getColor());
+        ledgerCategoryMapper.updateById(cat);
+        return cat;
+    }
+
+    public void deleteCategory(Long userId, Long id, Long migrateToId) {
+        LedgerCategory cat = ledgerCategoryMapper.selectById(id);
+        if (cat == null) {
+            throw new BusinessException(404, "分类不存在");
+        }
+        if (cat.getIsDefault() != null && cat.getIsDefault() == 1) {
+            throw new BusinessException(403, "系统默认分类不可删除");
+        }
+        if (!userId.equals(cat.getUserId())) {
+            throw new BusinessException(403, "只能删除自己的分类");
+        }
+
+        // Count records under this category
+        Long count = ledgerRecordMapper.selectCount(
+                new LambdaQueryWrapper<LedgerRecord>()
+                        .eq(LedgerRecord::getCategoryId, id));
+        if (count > 0) {
+            if (migrateToId == null) {
+                throw new BusinessException(400, "该分类下有 " + count + " 条收支记录，请先选择迁移目标分类（migrateTo）");
+            }
+            // Verify target category exists
+            LedgerCategory targetCat = ledgerCategoryMapper.selectById(migrateToId);
+            if (targetCat == null) {
+                throw new BusinessException(404, "目标分类不存在");
+            }
+            // Migrate records
+            List<LedgerRecord> records = ledgerRecordMapper.selectList(
+                    new LambdaQueryWrapper<LedgerRecord>()
+                            .eq(LedgerRecord::getCategoryId, id));
+            for (LedgerRecord r : records) {
+                r.setCategoryId(migrateToId);
+                ledgerRecordMapper.updateById(r);
+            }
+        }
+        ledgerCategoryMapper.deleteById(id);
+    }
+
+    // ========== 预算 CRUD ==========
+
+    public List<BudgetVO> getBudgets(Long userId, Integer year, Integer month) {
+        int y = year != null ? year : LocalDate.now().getYear();
+        int m = month != null ? month : LocalDate.now().getMonthValue();
+        LocalDate start = LocalDate.of(y, m, 1);
+        LocalDate end = start.plusMonths(1).minusDays(1);
+
+        List<LedgerBudget> budgets = ledgerBudgetMapper.selectList(
+                new LambdaQueryWrapper<LedgerBudget>()
+                        .eq(LedgerBudget::getUserId, userId)
+                        .eq(LedgerBudget::getYear, y)
+                        .eq(LedgerBudget::getMonth, m));
+
+        // Get actual spending per category for this month
+        List<LedgerRecord> records = ledgerRecordMapper.selectList(
+                new LambdaQueryWrapper<LedgerRecord>()
+                        .eq(LedgerRecord::getUserId, userId)
+                        .eq(LedgerRecord::getType, 0) // 支出 only
+                        .ge(LedgerRecord::getRecordDate, start)
+                        .le(LedgerRecord::getRecordDate, end));
+
+        Map<Long, BigDecimal> spentByCat = new HashMap<>();
+        for (LedgerRecord r : records) {
+            spentByCat.merge(r.getCategoryId(), r.getAmount(), BigDecimal::add);
+        }
+
+        List<BudgetVO> vos = new ArrayList<>();
+        for (LedgerBudget b : budgets) {
+            BudgetVO vo = new BudgetVO();
+            vo.setId(b.getId());
+            vo.setCategoryId(b.getCategoryId());
+            vo.setMonthlyLimit(b.getMonthlyLimit());
+            vo.setYear(b.getYear());
+            vo.setMonth(b.getMonth());
+
+            LedgerCategory cat = ledgerCategoryMapper.selectById(b.getCategoryId());
+            if (cat != null) {
+                vo.setCategoryName(cat.getName());
+                vo.setCategoryIcon(cat.getIcon());
+            }
+
+            BigDecimal spent = spentByCat.getOrDefault(b.getCategoryId(), BigDecimal.ZERO);
+            vo.setSpent(spent);
+            if (b.getMonthlyLimit().compareTo(BigDecimal.ZERO) > 0) {
+                vo.setPercentage(spent.multiply(new BigDecimal("100"))
+                        .divide(b.getMonthlyLimit(), 1, RoundingMode.HALF_UP));
+            } else {
+                vo.setPercentage(BigDecimal.ZERO);
+            }
+            vos.add(vo);
+        }
+        return vos;
+    }
+
+    public BudgetVO saveBudget(Long userId, CreateBudgetDTO dto) {
+        // Upsert: check if budget already exists for this user/category/year/month
+        LedgerBudget existing = ledgerBudgetMapper.selectOne(
+                new LambdaQueryWrapper<LedgerBudget>()
+                        .eq(LedgerBudget::getUserId, userId)
+                        .eq(LedgerBudget::getCategoryId, dto.getCategoryId())
+                        .eq(LedgerBudget::getYear, dto.getYear())
+                        .eq(LedgerBudget::getMonth, dto.getMonth()));
+
+        LedgerBudget budget;
+        if (existing != null) {
+            existing.setMonthlyLimit(dto.getMonthlyLimit());
+            ledgerBudgetMapper.updateById(existing);
+            budget = existing;
+        } else {
+            budget = new LedgerBudget();
+            budget.setUserId(userId);
+            budget.setCategoryId(dto.getCategoryId());
+            budget.setMonthlyLimit(dto.getMonthlyLimit());
+            budget.setYear(dto.getYear());
+            budget.setMonth(dto.getMonth());
+            ledgerBudgetMapper.insert(budget);
+        }
+
+        BudgetVO vo = new BudgetVO();
+        vo.setId(budget.getId());
+        vo.setCategoryId(budget.getCategoryId());
+        vo.setMonthlyLimit(budget.getMonthlyLimit());
+        vo.setYear(budget.getYear());
+        vo.setMonth(budget.getMonth());
+
+        LedgerCategory cat = ledgerCategoryMapper.selectById(budget.getCategoryId());
+        if (cat != null) {
+            vo.setCategoryName(cat.getName());
+            vo.setCategoryIcon(cat.getIcon());
+        }
+        return vo;
+    }
+
+    public BudgetVO updateBudget(Long userId, Long id, UpdateBudgetDTO dto) {
+        LedgerBudget budget = ledgerBudgetMapper.selectById(id);
+        if (budget == null || !budget.getUserId().equals(userId)) {
+            throw new BusinessException(404, "预算不存在");
+        }
+        if (dto.getMonthlyLimit() != null) {
+            budget.setMonthlyLimit(dto.getMonthlyLimit());
+        }
+        ledgerBudgetMapper.updateById(budget);
+
+        BudgetVO vo = new BudgetVO();
+        vo.setId(budget.getId());
+        vo.setCategoryId(budget.getCategoryId());
+        vo.setMonthlyLimit(budget.getMonthlyLimit());
+        vo.setYear(budget.getYear());
+        vo.setMonth(budget.getMonth());
+
+        LedgerCategory cat = ledgerCategoryMapper.selectById(budget.getCategoryId());
+        if (cat != null) {
+            vo.setCategoryName(cat.getName());
+            vo.setCategoryIcon(cat.getIcon());
+        }
+        return vo;
+    }
+
+    public void deleteBudget(Long userId, Long id) {
+        LedgerBudget budget = ledgerBudgetMapper.selectById(id);
+        if (budget == null || !budget.getUserId().equals(userId)) {
+            throw new BusinessException(404, "预算不存在");
+        }
+        ledgerBudgetMapper.deleteById(id);
     }
 
     // ========== 内部 ==========

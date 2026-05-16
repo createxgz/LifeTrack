@@ -25,6 +25,7 @@ public class DashboardService {
     private final WeightRecordMapper weightRecordMapper;
     private final DietRecordMapper dietRecordMapper;
     private final LedgerRecordMapper ledgerRecordMapper;
+    private final LedgerBudgetMapper ledgerBudgetMapper;
 
     public DashboardOverviewVO getOverview(Long userId) {
         LocalDate today = LocalDate.now();
@@ -147,6 +148,25 @@ public class DashboardService {
         vo.setMonthlyIncome(income);
         vo.setMonthlyExpense(expense);
         vo.setBalance(income.subtract(expense));
+
+        // Budget — total for this month
+        List<LedgerBudget> budgets = ledgerBudgetMapper.selectList(
+                new LambdaQueryWrapper<LedgerBudget>()
+                        .eq(LedgerBudget::getUserId, userId)
+                        .eq(LedgerBudget::getYear, today.getYear())
+                        .eq(LedgerBudget::getMonth, today.getMonthValue()));
+        BigDecimal totalBudget = budgets.stream()
+                .map(LedgerBudget::getMonthlyLimit)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setMonthlyBudget(totalBudget);
+        if (totalBudget.compareTo(BigDecimal.ZERO) > 0) {
+            vo.setBudgetRemaining(totalBudget.subtract(expense));
+            vo.setBudgetUsagePercent(expense.multiply(new BigDecimal("100"))
+                    .divide(totalBudget, 1, java.math.RoundingMode.HALF_UP));
+        } else {
+            vo.setBudgetRemaining(null);
+            vo.setBudgetUsagePercent(null);
+        }
 
         return vo;
     }

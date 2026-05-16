@@ -49,6 +49,38 @@
       </div>
     </div>
 
+    <!-- Wallet Card -->
+    <div class="wallet-card">
+      <div class="wallet-summary" @click="walletExpanded = !walletExpanded">
+        <div class="wallet-left">
+          <div class="wallet-icon-wrap">
+            <el-icon :size="20"><Coin /></el-icon>
+          </div>
+          <div class="wallet-info">
+            <span class="wallet-label">钱包总额</span>
+            <span class="wallet-value">{{ fmtMoney(walletTotal) }}</span>
+          </div>
+        </div>
+        <div class="wallet-right">
+          <el-button class="wallet-edit-btn" size="small" @click.stop="openWalletDialog">
+            <el-icon :size="14"><Edit /></el-icon>
+            编辑
+          </el-button>
+          <el-icon :class="['wallet-chevron', { expanded: walletExpanded }]"><ArrowDown /></el-icon>
+        </div>
+      </div>
+      <div v-if="walletExpanded && walletAccounts.length > 0" class="wallet-breakdown">
+        <div v-for="acct in walletAccounts" :key="acct.id" class="wallet-account-row">
+          <span class="account-type-tag" :class="'tag-' + (acct.accountType || 'other')">{{ accountTypeLabel(acct.accountType) }}</span>
+          <span class="account-name">{{ acct.name }}</span>
+          <span class="account-amount">{{ fmtMoney(acct.amount) }}</span>
+        </div>
+      </div>
+      <div v-if="walletExpanded && walletAccounts.length === 0" class="wallet-empty">
+        暂无账户，点击「编辑」添加
+      </div>
+    </div>
+
     <!-- Charts Row -->
     <div class="charts-row">
       <div class="chart-card">
@@ -67,6 +99,38 @@
       </div>
     </div>
 
+    <!-- Budget Card -->
+    <div class="data-card budget-card">
+      <div class="card-header">
+        <h3>预算管理</h3>
+        <el-button size="small" @click="openBudgetDialog">
+          <el-icon :size="14"><Edit /></el-icon>
+          编辑预算
+        </el-button>
+      </div>
+      <div v-if="budgets.length === 0" class="budget-empty">
+        暂无预算设定，点击「编辑预算」为支出分类设置月度限额
+      </div>
+      <div v-else class="budget-list">
+        <div v-for="b in budgets" :key="b.id" class="budget-row">
+          <span class="budget-cat">{{ b.categoryName }}</span>
+          <span class="budget-spent">已花 ¥{{ fmtMoney(b.spent) }}</span>
+          <div class="budget-bar-wrap">
+            <div class="budget-bar-fill" :style="{ width: Math.min(Number(b.percentage), 100) + '%', background: Number(b.percentage) > 100 ? '#DC2626' : Number(b.percentage) > 80 ? '#F59E0B' : '#0F766E' }"></div>
+          </div>
+          <span class="budget-limit">/ ¥{{ fmtMoney(b.monthlyLimit) }}</span>
+          <span class="budget-pct" :class="{ over: Number(b.percentage) > 100 }">{{ Math.round(Number(b.percentage)) }}%</span>
+        </div>
+      </div>
+      <div class="budget-summary" v-if="budgets.length > 0">
+        <span>合计预算 ¥{{ fmtMoney(totalBudget) }}</span>
+        <span>已用 ¥{{ fmtMoney(totalBudgetSpent) }}</span>
+        <span :class="totalBudgetRemaining >= 0 ? 'income-value' : 'expense-value'">
+          剩余 {{ fmtSignedMoney(totalBudgetRemaining) }}
+        </span>
+      </div>
+    </div>
+
     <!-- Records Table -->
     <div class="data-card">
       <div class="card-header">
@@ -76,9 +140,12 @@
             <el-option label="支出" :value="0" />
             <el-option label="收入" :value="1" />
           </el-select>
-          <el-select v-model="filterCategory" placeholder="全部分类" clearable size="small" style="width: 130px; margin-right: 8px" @change="onFilterChange">
+          <el-select v-model="filterCategory" placeholder="全部分类" clearable size="small" style="width: 130px; margin-right: 4px" @change="onFilterChange">
             <el-option v-for="c in allCategories" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
+          <el-button size="small" @click="openCategoryDialog" style="margin-right: 8px">
+            <el-icon :size="14"><Setting /></el-icon>
+          </el-button>
           <el-date-picker
             v-model="filterDate"
             type="date"
@@ -186,13 +253,189 @@
         <el-button type="primary" @click="submitForm" :loading="submitting">确认</el-button>
       </template>
     </el-dialog>
+
+    <!-- Wallet Dialog -->
+    <el-dialog v-model="walletDialogVisible" title="编辑钱包账户" width="520px" destroy-on-close>
+      <div class="wallet-dialog-total">
+        <span>总余额</span>
+        <strong>{{ fmtMoney(walletTotal) }}</strong>
+      </div>
+      <el-table :data="walletAccounts" stripe style="width: 100%" empty-text="暂无账户，请在下方添加">
+        <el-table-column label="账户名称" min-width="120">
+          <template #default="{ row, $index }">
+            <template v-if="walletEditingIdx === $index">
+              <el-input v-model="walletEditForm.name" size="small" placeholder="账户名称" />
+            </template>
+            <template v-else>{{ row.name }}</template>
+          </template>
+        </el-table-column>
+        <el-table-column label="类型" width="90">
+          <template #default="{ row, $index }">
+            <template v-if="walletEditingIdx === $index">
+              <el-select v-model="walletEditForm.accountType" size="small" style="width:100%">
+                <el-option label="银行卡" value="bank" />
+                <el-option label="支付宝" value="alipay" />
+                <el-option label="微信" value="wechat" />
+                <el-option label="现金" value="cash" />
+                <el-option label="投资" value="investment" />
+                <el-option label="其他" value="other" />
+              </el-select>
+            </template>
+            <template v-else>
+              <span class="account-type-tag" :class="'tag-' + (row.accountType || 'other')">{{ accountTypeLabel(row.accountType) }}</span>
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="金额" width="120">
+          <template #default="{ row, $index }">
+            <template v-if="walletEditingIdx === $index">
+              <el-input-number v-model="walletEditForm.amount" :min="0" :precision="2" size="small" controls-position="right" style="width:100%" />
+            </template>
+            <template v-else>{{ fmtMoney(row.amount) }}</template>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="110" fixed="right">
+          <template #default="{ row, $index }">
+            <template v-if="walletEditingIdx === $index">
+              <el-button type="primary" link size="small" @click="saveWalletEdit(row.id)">保存</el-button>
+              <el-button link size="small" @click="walletEditingIdx = null">取消</el-button>
+            </template>
+            <template v-else>
+              <el-button type="primary" link size="small" @click="startEditWallet(row, $index)">
+                <el-icon :size="15"><Edit /></el-icon>
+              </el-button>
+              <el-button type="danger" link size="small" @click="handleDeleteWallet(row.id)">
+                <el-icon :size="15"><Delete /></el-icon>
+              </el-button>
+            </template>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="wallet-add-row" v-if="walletEditingIdx === -1">
+        <el-input v-model="walletEditForm.name" size="small" placeholder="账户名称" style="width:140px" />
+        <el-select v-model="walletEditForm.accountType" size="small" placeholder="类型" style="width:90px">
+          <el-option label="银行卡" value="bank" />
+          <el-option label="支付宝" value="alipay" />
+          <el-option label="微信" value="wechat" />
+          <el-option label="现金" value="cash" />
+          <el-option label="投资" value="investment" />
+          <el-option label="其他" value="other" />
+        </el-select>
+        <el-input-number v-model="walletEditForm.amount" :min="0" :precision="2" size="small" controls-position="right" placeholder="金额" style="width:130px" />
+        <el-button type="primary" size="small" @click="saveWalletEdit(null)">添加</el-button>
+        <el-button size="small" @click="walletEditingIdx = null">取消</el-button>
+      </div>
+      <template #footer>
+        <el-button @click="startAddWallet" :disabled="walletEditingIdx != null">新增账户</el-button>
+        <el-button @click="walletDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Category Management Dialog -->
+    <el-dialog v-model="categoryDialogVisible" title="管理分类" width="600px" destroy-on-close>
+      <el-tabs v-model="categoryTab">
+        <el-tab-pane label="支出分类" :name="0" />
+        <el-tab-pane label="收入分类" :name="1" />
+      </el-tabs>
+      <el-table :data="categorizedCategories" stripe style="width: 100%" empty-text="暂无分类">
+        <el-table-column label="分类名" min-width="140">
+          <template #default="{ row }">
+            <template v-if="categoryEditingId === row.id">
+              <el-input v-model="categoryEditForm.name" size="small" placeholder="分类名称" />
+            </template>
+            <template v-else>
+              {{ row.name }}
+              <el-tag v-if="row.isDefault === 1" size="small" type="info" effect="plain" style="margin-left:6px">系统</el-tag>
+              <el-tag v-else size="small" type="warning" effect="plain" style="margin-left:6px">自定义</el-tag>
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="140" fixed="right">
+          <template #default="{ row }">
+            <template v-if="row.isDefault === 1">
+              <span class="text-muted">—</span>
+            </template>
+            <template v-else>
+              <template v-if="categoryEditingId === row.id">
+                <el-button type="primary" link size="small" @click="saveCategoryEdit(row.id)">保存</el-button>
+                <el-button link size="small" @click="categoryEditingId = null">取消</el-button>
+              </template>
+              <template v-else>
+                <el-button type="primary" link size="small" @click="startEditCategory(row)">
+                  <el-icon :size="15"><Edit /></el-icon>
+                </el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteCategory(row)">
+                  <el-icon :size="15"><Delete /></el-icon>
+                </el-button>
+              </template>
+            </template>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div v-if="categoryEditingId === -1" class="category-add-row">
+        <el-input v-model="categoryEditForm.name" size="small" placeholder="新分类名称" style="width:160px" />
+        <el-button type="primary" size="small" @click="saveCategoryEdit(null)">添加</el-button>
+        <el-button size="small" @click="categoryEditingId = null">取消</el-button>
+      </div>
+      <template #footer>
+        <el-button @click="startAddCategory" :disabled="categoryEditingId != null">新增分类</el-button>
+        <el-button @click="categoryDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Budget Management Dialog -->
+    <el-dialog v-model="budgetDialogVisible" title="编辑月度预算" width="560px" destroy-on-close>
+      <p class="budget-dialog-hint">{{ yearMonthLabel }} · 为支出分类设置预算上限</p>
+      <el-table :data="budgetEditList" stripe style="width: 100%" empty-text="暂无支出分类">
+        <el-table-column label="分类" min-width="100">
+          <template #default="{ row }">{{ row.categoryName }}</template>
+        </el-table-column>
+        <el-table-column label="当月已花" width="110">
+          <template #default="{ row }">
+            <span :class="row.spent > row.limitInput ? 'expense-value' : ''">¥{{ fmtMoney(row.spent) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="预算上限" min-width="160">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-model="row.limitInput"
+              :min="0"
+              :precision="2"
+              controls-position="right"
+              size="small"
+              style="width: 130px"
+              placeholder="不设预算"
+            />
+            <el-button v-if="row.budgetId" type="danger" link size="small" style="margin-left:4px" @click="handleDeleteBudget(row.budgetId, $index)">
+              <el-icon :size="14"><Delete /></el-icon>
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="budgetDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveAllBudgets" :loading="budgetSaving">保存全部</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Category Delete Migration Dialog -->
+    <el-dialog v-model="migrateDialogVisible" title="迁移记录" width="440px" destroy-on-close>
+      <p class="migrate-text">删除分类 <strong>{{ deletingCategory?.name }}</strong> 前，请选择将已有的收支记录迁移到哪个分类：</p>
+      <el-select v-model="migrateTargetId" placeholder="选择目标分类" style="width: 100%">
+        <el-option v-for="c in migrateOptions" :key="c.id" :label="c.name" :value="c.id" />
+      </el-select>
+      <template #footer>
+        <el-button @click="migrateDialogVisible = false">取消</el-button>
+        <el-button type="danger" @click="confirmDeleteCategory" :disabled="!migrateTargetId">确认删除并迁移</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, ArrowRight, Top, Bottom, Wallet, Plus, Edit, Delete, Download } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, ArrowDown, Top, Bottom, Wallet, Plus, Edit, Delete, Download, Coin, Setting } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { ledgerApi } from '@/api/ledger'
 
@@ -325,18 +568,222 @@ async function handleDelete(id) {
   } catch {}
 }
 
+// ==================== Wallet ====================
+const walletTotal = ref(0)
+const walletAccounts = ref([])
+const walletExpanded = ref(false)
+const walletDialogVisible = ref(false)
+const walletEditingIdx = ref(null)
+const walletEditForm = reactive({ name: '', accountType: 'bank', amount: 0 })
+
+function accountTypeLabel(type) {
+  const map = { bank: '银行卡', alipay: '支付宝', wechat: '微信', cash: '现金', investment: '投资', other: '其他' }
+  return map[type] || '其他'
+}
+
+async function fetchWallets() {
+  try {
+    const res = await ledgerApi.getWallets()
+    walletTotal.value = res.data.total || 0
+    walletAccounts.value = res.data.accounts || []
+  } catch {}
+}
+
+function openWalletDialog() {
+  walletEditingIdx.value = null
+  walletDialogVisible.value = true
+}
+
+function startAddWallet() {
+  walletEditForm.name = ''
+  walletEditForm.accountType = 'bank'
+  walletEditForm.amount = 0
+  walletEditingIdx.value = -1
+}
+
+function startEditWallet(row, idx) {
+  walletEditForm.name = row.name
+  walletEditForm.accountType = row.accountType || 'bank'
+  walletEditForm.amount = row.amount
+  walletEditingIdx.value = idx
+}
+
+async function saveWalletEdit(id) {
+  if (!walletEditForm.name.trim()) { ElMessage.warning('请输入账户名称'); return }
+  if (!walletEditForm.amount || walletEditForm.amount <= 0) { ElMessage.warning('请输入金额'); return }
+  try {
+    const payload = {
+      name: walletEditForm.name.trim(),
+      accountType: walletEditForm.accountType,
+      amount: walletEditForm.amount
+    }
+    if (id != null) {
+      await ledgerApi.updateWallet(id, payload)
+      ElMessage.success('已更新')
+    } else {
+      await ledgerApi.addWallet(payload)
+      ElMessage.success('已添加')
+    }
+    walletEditingIdx.value = null
+    await fetchWallets()
+  } catch {}
+}
+
+async function handleDeleteWallet(id) {
+  try { await ElMessageBox.confirm('确定删除该钱包账户？', '确认删除', { type: 'warning' }) } catch { return }
+  try {
+    await ledgerApi.deleteWallet(id)
+    ElMessage.success('已删除')
+    await fetchWallets()
+  } catch {}
+}
+
 // ==================== Categories ====================
 const allCategories = ref([])
+const categoryDialogVisible = ref(false)
+const categoryTab = ref(0)
+const categoryEditingId = ref(null)
+const categoryEditForm = reactive({ name: '' })
+const migrateDialogVisible = ref(false)
+const deletingCategory = ref(null)
+const migrateTargetId = ref(null)
 
 const filteredCategories = computed(() => {
   if (form.type == null) return allCategories.value
   return allCategories.value.filter(c => c.type === form.type)
 })
 
+const categorizedCategories = computed(() => {
+  return allCategories.value.filter(c => c.type === categoryTab.value)
+})
+
+const migrateOptions = computed(() => {
+  if (!deletingCategory.value) return []
+  return allCategories.value.filter(c => c.type === deletingCategory.value.type && c.id !== deletingCategory.value.id)
+})
+
 async function fetchCategories() {
   try {
     const res = await ledgerApi.getCategories()
     allCategories.value = res.data || []
+  } catch {}
+}
+
+function openCategoryDialog() {
+  categoryEditingId.value = null
+  categoryDialogVisible.value = true
+}
+
+function startAddCategory() {
+  categoryEditForm.name = ''
+  categoryEditingId.value = -1
+}
+
+function startEditCategory(row) {
+  categoryEditForm.name = row.name
+  categoryEditingId.value = row.id
+}
+
+async function saveCategoryEdit(id) {
+  if (!categoryEditForm.name.trim()) { ElMessage.warning('请输入分类名称'); return }
+  try {
+    if (id != null) {
+      await ledgerApi.updateCategory(id, { name: categoryEditForm.name.trim() })
+      ElMessage.success('已更新')
+    } else {
+      await ledgerApi.addCategory({ name: categoryEditForm.name.trim(), type: categoryTab.value })
+      ElMessage.success('已添加')
+    }
+    categoryEditingId.value = null
+    await fetchCategories()
+  } catch {}
+}
+
+function handleDeleteCategory(row) {
+  deletingCategory.value = row
+  migrateTargetId.value = null
+  migrateDialogVisible.value = true
+}
+
+async function confirmDeleteCategory() {
+  if (!migrateTargetId.value) return
+  try {
+    await ledgerApi.deleteCategory(deletingCategory.value.id, migrateTargetId.value)
+    ElMessage.success('已删除并迁移')
+    migrateDialogVisible.value = false
+    deletingCategory.value = null
+    await fetchCategories()
+  } catch {}
+}
+
+// ==================== Budgets ====================
+const budgets = ref([])
+const budgetDialogVisible = ref(false)
+const budgetSaving = ref(false)
+const budgetEditList = ref([])
+
+const totalBudget = computed(() => {
+  return budgets.value.reduce((sum, b) => sum + Number(b.monthlyLimit || 0), 0)
+})
+const totalBudgetSpent = computed(() => {
+  return budgets.value.reduce((sum, b) => sum + Number(b.spent || 0), 0)
+})
+const totalBudgetRemaining = computed(() => {
+  return totalBudget.value - totalBudgetSpent.value
+})
+
+async function fetchBudgets() {
+  try {
+    const res = await ledgerApi.getBudgets({ year: currentYear.value, month: currentMonth.value })
+    budgets.value = res.data || []
+  } catch {}
+}
+
+function openBudgetDialog() {
+  const expenseCats = allCategories.value.filter(c => c.type === 0)
+  const budgetMap = {}
+  budgets.value.forEach(b => { budgetMap[b.categoryId] = b })
+  budgetEditList.value = expenseCats.map(c => ({
+    categoryId: c.id,
+    categoryName: c.name,
+    spent: budgetMap[c.id] ? Number(budgetMap[c.id].spent || 0) : 0,
+    limitInput: budgetMap[c.id] ? Number(budgetMap[c.id].monthlyLimit || 0) : null,
+    budgetId: budgetMap[c.id] ? budgetMap[c.id].id : null
+  }))
+  budgetDialogVisible.value = true
+}
+
+async function saveAllBudgets() {
+  budgetSaving.value = true
+  try {
+    for (const row of budgetEditList.value) {
+      if (row.budgetId) {
+        if (row.limitInput > 0) {
+          await ledgerApi.updateBudget(row.budgetId, { monthlyLimit: row.limitInput })
+        } else {
+          await ledgerApi.deleteBudget(row.budgetId)
+        }
+      } else if (row.limitInput > 0) {
+        await ledgerApi.saveBudget({
+          categoryId: row.categoryId,
+          monthlyLimit: row.limitInput,
+          year: currentYear.value,
+          month: currentMonth.value
+        })
+      }
+    }
+    ElMessage.success('预算已保存')
+    budgetDialogVisible.value = false
+    await fetchBudgets()
+  } catch {} finally { budgetSaving.value = false }
+}
+
+async function handleDeleteBudget(budgetId, index) {
+  try {
+    await ledgerApi.deleteBudget(budgetId)
+    budgetEditList.value[index].limitInput = null
+    budgetEditList.value[index].budgetId = null
+    ElMessage.success('预算已删除')
   } catch {}
 }
 
@@ -449,8 +896,10 @@ function paymentLabel(p) {
 
 // ==================== Lifecycle ====================
 function refreshAll() {
+  fetchWallets()
   fetchStats()
   fetchRecords()
+  fetchBudgets()
 }
 
 let resizeHandler
@@ -458,9 +907,7 @@ let resizeHandler
 onMounted(async () => {
   resizeHandler = () => { expenseChart?.resize(); incomeChart?.resize() }
   window.addEventListener('resize', resizeHandler)
-  await fetchCategories()
-  await fetchStats()
-  await fetchRecords()
+  await Promise.all([fetchCategories(), fetchWallets(), fetchStats(), fetchRecords(), fetchBudgets()])
 })
 
 onUnmounted(() => {
@@ -745,5 +1192,258 @@ onUnmounted(() => {
 }
 :deep(.el-radio-button__inner) {
   font-family: 'DM Sans', sans-serif;
+}
+
+/* ── Wallet Card ── */
+.wallet-card {
+  background: linear-gradient(135deg, #1a1f36 0%, #2d334f 100%);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(26,31,54,0.12);
+}
+.wallet-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+.wallet-summary:hover {
+  background: rgba(255,255,255,0.03);
+}
+.wallet-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.wallet-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(201,169,110,0.2);
+  color: #c9a96e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wallet-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wallet-label {
+  font-size: 12px;
+  color: rgba(255,255,255,0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.wallet-value {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+.wallet-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wallet-edit-btn {
+  border-color: rgba(201,169,110,0.5) !important;
+  color: #c9a96e !important;
+  background: rgba(201,169,110,0.1) !important;
+  font-weight: 600;
+  border-radius: 8px;
+}
+.wallet-edit-btn:hover {
+  background: rgba(201,169,110,0.2) !important;
+  border-color: #c9a96e !important;
+  color: #dbb87a !important;
+}
+.wallet-chevron {
+  color: rgba(255,255,255,0.5);
+  font-size: 16px;
+  transition: transform 0.25s;
+}
+.wallet-chevron.expanded {
+  transform: rotate(180deg);
+}
+.wallet-breakdown {
+  padding: 0 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wallet-account-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
+}
+.account-type-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.tag-bank { background: #e8f0fe; color: #3b6b8c; }
+.tag-alipay { background: #e6f0ff; color: #1677ff; }
+.tag-wechat { background: #e6f9e8; color: #07c160; }
+.tag-cash { background: #fff7e6; color: #d48806; }
+.tag-investment { background: #f9e8ff; color: #722ed1; }
+.tag-other { background: #f3f3f0; color: #6b6d7a; }
+.account-name {
+  flex: 1;
+  font-size: 13px;
+  color: rgba(255,255,255,0.8);
+}
+.account-amount {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #c9a96e;
+}
+.wallet-empty {
+  padding: 0 24px 16px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  text-align: center;
+}
+
+/* ── Wallet Dialog ── */
+.wallet-dialog-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f8f8f5;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  font-size: 14px;
+  color: #6b6d7a;
+}
+.wallet-dialog-total strong {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 20px;
+  color: #1a1f36;
+}
+.wallet-add-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  align-items: center;
+}
+
+/* ── Category Dialog ── */
+.category-add-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  align-items: center;
+}
+.text-muted {
+  color: #c0c2cc;
+}
+
+/* ── Budget Card ── */
+.budget-card {
+  margin-bottom: 20px;
+}
+.budget-empty {
+  font-size: 13px;
+  color: #b0b2bd;
+  text-align: center;
+  padding: 16px 0;
+}
+.budget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.budget-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+.budget-row:not(:last-child) {
+  border-bottom: 0.5px solid #f3f3f0;
+}
+.budget-cat {
+  width: 80px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1f36;
+  flex-shrink: 0;
+}
+.budget-spent {
+  font-size: 12px;
+  color: #6b6d7a;
+  font-weight: 500;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+.budget-bar-wrap {
+  flex: 1;
+  height: 8px;
+  background: #f3f3f0;
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 60px;
+}
+.budget-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  min-width: 0;
+}
+.budget-limit {
+  font-size: 12px;
+  color: #8a8d9c;
+  flex-shrink: 0;
+}
+.budget-pct {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0F766E;
+  min-width: 40px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.budget-pct.over { color: #DC2626; }
+
+.budget-summary {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #eeedea;
+  font-size: 13px;
+  color: #6b6d7a;
+  font-weight: 500;
+}
+
+/* ── Budget Dialog ── */
+.budget-dialog-hint {
+  font-size: 13px;
+  color: #8a8d9c;
+  margin: 0 0 14px;
+}
+
+/* ── Migrate Dialog ── */
+.migrate-text {
+  font-size: 14px;
+  color: #4a4d5c;
+  margin: 0 0 14px;
+  line-height: 1.6;
 }
 </style>
