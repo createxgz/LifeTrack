@@ -37,5 +37,10 @@ logs/
 # Java
 *.class
 
+# Design documents
+*.docx
+*设计文档*.md
+*设计文档*.docx
+
 # Temporary files
 *.tmp
