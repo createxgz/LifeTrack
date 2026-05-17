@@ -430,7 +430,9 @@ function handleForgotPassword() {
 .login-page {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  width: 100vw;
   min-height: 100vh;
+  margin-left: calc(50% - 50vw);
   font-family: 'PingFang SC', 'Helvetica Neue', -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -439,7 +441,7 @@ function handleForgotPassword() {
 /* ── 左侧品牌区 ── */
 .brand-panel {
   background: #FDF6EE;
-  padding: 64px 60px;
+  padding: 60px 56px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -468,25 +470,25 @@ function handleForgotPassword() {
   pointer-events: none;
 }
 .ring-top {
-  width: 420px;
-  height: 420px;
+  width: 320px;
+  height: 320px;
   top: -160px;
-  right: -140px;
-  border: 1px solid rgba(251, 191, 116, 0.22);
+  right: -130px;
+  border: 1px solid rgba(251, 191, 116, 0.18);
 }
 .ring-mid {
-  width: 180px;
-  height: 180px;
-  top: 52%;
-  right: -60px;
-  border: 0.75px solid rgba(251, 191, 116, 0.14);
+  width: 120px;
+  height: 120px;
+  top: 38%;
+  right: -80px;
+  border: 0.75px solid rgba(251, 191, 116, 0.12);
 }
 .ring-bottom {
-  width: 280px;
-  height: 280px;
-  bottom: -100px;
-  left: -100px;
-  border: 1px solid rgba(251, 191, 116, 0.13);
+  width: 240px;
+  height: 240px;
+  bottom: -120px;
+  left: -120px;
+  border: 1px solid rgba(251, 191, 116, 0.10);
 }
 
 .brand-content {
@@ -494,6 +496,8 @@ function handleForgotPassword() {
   z-index: 1;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
 }
 
 /* Logo */
@@ -501,7 +505,7 @@ function handleForgotPassword() {
   display: flex;
   align-items: center;
   gap: 11px;
-  margin-bottom: 56px;
+  margin-bottom: 48px;
 }
 .logo-icon {
   width: 38px;
@@ -522,14 +526,14 @@ function handleForgotPassword() {
 
 /* 主标题 */
 .headline {
-  margin: 0 0 20px;
+  margin: 0 0 18px;
 }
 .headline-line {
   display: block;
   font-size: var(--text-2xl);
   font-weight: 600;
   color: #1C1917;
-  line-height: var(--leading-tight);
+  line-height: 1.45;
   letter-spacing: -0.025em;
 }
 
@@ -538,7 +542,7 @@ function handleForgotPassword() {
   font-size: var(--text-sm);
   color: #78716C;
   line-height: var(--leading-relaxed);
-  margin: 0 0 6px;
+  margin: 0 0 10px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -568,14 +572,14 @@ function handleForgotPassword() {
 .features {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  margin-top: 44px;
+  gap: 16px;
+  margin-top: 36px;
 }
 .feature-item {
   display: flex;
   align-items: flex-start;
   gap: 13px;
-  padding: 6px 10px 6px 0;
+  padding: 4px 10px 4px 0;
   border-radius: 8px;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   animation: featSlideIn 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) both;
@@ -584,8 +588,8 @@ function handleForgotPassword() {
   transform: translateX(4px);
 }
 .feat-icon {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -606,7 +610,7 @@ function handleForgotPassword() {
 .feat-desc {
   font-size: var(--text-xs);
   color: #78716C;
-  margin-top: 3px;
+  margin-top: 2px;
   line-height: 1.4;
 }
 
@@ -656,7 +660,7 @@ function handleForgotPassword() {
 .tab-row {
   display: flex;
   border-bottom: 1px solid #F0EDE8;
-  margin-bottom: 36px;
+  margin-bottom: 28px;
   gap: 4px;
 }
 .tab-item {
@@ -777,7 +781,7 @@ function handleForgotPassword() {
   color: #C4BFB8;
 }
 
-:deep(.el-form-item) { margin-bottom: 18px; }
+:deep(.el-form-item) { margin-bottom: 15px; }
 :deep(.el-form-item__error) {
   font-size: var(--text-xs);
   padding-top: 4px;
@@ -789,7 +793,7 @@ function handleForgotPassword() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 .remember-check :deep(.el-checkbox__label) {
   font-size: var(--text-xs);
@@ -871,7 +875,7 @@ function handleForgotPassword() {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin: 24px 0;
+  margin: 20px 0;
 }
 .divider-line {
   flex: 1;
@@ -919,7 +923,7 @@ function handleForgotPassword() {
   text-align: center;
   font-size: var(--text-xs);
   color: #78716C;
-  margin-top: 26px;
+  margin-top: 22px;
   line-height: 1.6;
 }
 .switch-link {
@@ -941,7 +945,7 @@ function handleForgotPassword() {
   gap: 5px;
   font-size: var(--text-xs);
   color: #B8B0A8;
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 /* ── 响应式 ── */
