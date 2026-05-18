@@ -7,8 +7,8 @@ spring:
 
   datasource:
     url: jdbc:mysql://localhost:3306/lifetrack?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false
-    username: root
-    password: 123456
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   flyway:
@@ -19,8 +19,8 @@ spring:
   mail:
     host: smtp.qq.com
     port: 465
-    username: SMTP_USERNAME_REMOVED
-    password: SMTP_PASSWORD_REMOVED
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
     properties:
       mail.smtp.auth: true
       mail.smtp.ssl.enable: true

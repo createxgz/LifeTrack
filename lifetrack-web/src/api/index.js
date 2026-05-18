@@ -1,13 +1,23 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import router from '@/router'
 
 const http = axios.create({
   baseURL: '/api',
   timeout: 15000
 })
 
+function getToken() {
+  return localStorage.getItem('token') || sessionStorage.getItem('token')
+}
+
+function clearToken() {
+  localStorage.removeItem('token')
+  sessionStorage.removeItem('token')
+}
+
 http.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
+  const token = getToken()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -24,9 +34,10 @@ http.interceptors.response.use(
     return res
   },
   error => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/auth/login'
+    const status = error.response?.status
+    if (status === 401 || status === 403) {
+      clearToken()
+      router.push('/auth/login')
     }
     ElMessage.error(error.message || '网络错误')
     return Promise.reject(error)

@@ -2,6 +2,7 @@ package com.lifetrack.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.lifetrack.common.exception.BusinessException;
+import com.lifetrack.config.JwtProperties;
 import com.lifetrack.config.JwtUtils;
 import com.lifetrack.dto.*;
 import com.lifetrack.entity.User;
@@ -22,6 +23,7 @@ public class AuthService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
+    private final JwtProperties jwtProperties;
     private final EmailService emailService;
 
     public void register(RegisterDTO dto) {
@@ -49,8 +51,7 @@ public class AuthService {
         }
 
         String token = jwtUtils.generateToken(user.getId());
-        long expire = 604800; // 7 days
-        return new LoginVO(token, expire, token);
+        return new LoginVO(token, jwtProperties.getExpiration(), token);
     }
 
     public UserProfileVO getProfile(Long userId) {
@@ -63,10 +64,13 @@ public class AuthService {
         vo.setId(user.getId());
         vo.setNickname(user.getNickname());
         vo.setAvatar(user.getAvatar());
+        vo.setGender(user.getGender());
+        vo.setBirthday(user.getBirthday());
         vo.setHeight(user.getHeight());
         vo.setTargetWeight(user.getTargetWeight());
         vo.setEmail(user.getEmail());
         vo.setNotifyEmail(user.getNotifyEmail());
+        vo.setCreatedAt(user.getCreatedAt());
         return vo;
     }
 

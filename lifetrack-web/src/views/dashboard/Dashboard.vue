@@ -47,19 +47,19 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { HomeFilled, List, Histogram, Money, UserFilled } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const user = ref(null)
+const user = computed(() => authStore.user)
 
-onMounted(async () => {
-  try {
-    user.value = await authStore.fetchProfile()
-  } catch {}
+onMounted(() => {
+  if (!authStore.user) {
+    authStore.fetchProfile().catch(() => {})
+  }
 })
 
 function handleLogout() {

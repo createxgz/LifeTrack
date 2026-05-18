@@ -275,7 +275,7 @@ const pwdRules = {
 async function loadProfile() {
   try {
     const data = await userApi.getProfile()
-    authStore.setUserInfo(data)
+    authStore.setUserInfo(data.data)
     infoForm.email = data.email || ''
     infoForm.nickname = data.nickname || ''
     infoForm.gender = data.gender ?? null
