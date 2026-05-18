@@ -25,12 +25,16 @@
           <el-icon><Money /></el-icon>
           <span>账本管理</span>
         </router-link>
+        <router-link to="/profile" class="nav-item" active-class="active">
+          <el-icon><UserFilled /></el-icon>
+          <span>个人设置</span>
+        </router-link>
       </nav>
       <div class="sidebar-footer">
-        <div class="user-info">
+        <router-link to="/profile" class="user-info">
           <span class="user-avatar">{{ user?.nickname?.charAt(0) || '?' }}</span>
           <span class="user-name">{{ user?.nickname }}</span>
-        </div>
+        </router-link>
         <button class="logout-btn" @click="handleLogout">退出</button>
       </div>
     </aside>
@@ -46,7 +50,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
-import { HomeFilled, List, Histogram, Money } from '@element-plus/icons-vue'
+import { HomeFilled, List, Histogram, Money, UserFilled } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -154,6 +158,15 @@ function handleLogout() {
   align-items: center;
   gap: 8px;
   overflow: hidden;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px;
+  margin: -4px;
+  transition: background 0.15s;
+}
+.user-info:hover {
+  background: rgba(194, 65, 12, 0.06);
 }
 
 .user-avatar {

@@ -22,6 +22,8 @@ public class User {
     private java.math.BigDecimal targetWeight;
     private String notifyEmail;
     private Integer status;
+    private String resetToken;
+    private LocalDateTime resetTokenExp;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

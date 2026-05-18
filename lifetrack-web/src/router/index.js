@@ -31,6 +31,11 @@ const routes = [
         path: 'ledger',
         name: 'Ledger',
         component: () => import('../views/ledger/LedgerPage.vue')
+      },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('../views/profile/ProfilePage.vue')
       }
     ]
   },
@@ -45,6 +50,16 @@ const routes = [
     name: 'Register',
     component: () => import('../views/auth/AuthPage.vue'),
     meta: { guest: true }
+  },
+  {
+    path: '/auth/forgot-password',
+    name: 'ForgotPassword',
+    component: () => import('../views/auth/ForgotPasswordPage.vue')
+  },
+  {
+    path: '/auth/reset-password',
+    name: 'ResetPassword',
+    component: () => import('../views/auth/ResetPasswordPage.vue')
   }
 ]
 

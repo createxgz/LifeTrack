@@ -405,7 +405,7 @@ function handleMiniProgram() {
 }
 
 function handleForgotPassword() {
-  ElMessage.info('忘记密码功能开发中')
+  router.push('/auth/forgot-password')
 }
 </script>
 

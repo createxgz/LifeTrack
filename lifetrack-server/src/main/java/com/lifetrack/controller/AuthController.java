@@ -1,9 +1,7 @@
 package com.lifetrack.controller;
 
 import com.lifetrack.common.Result;
-import com.lifetrack.dto.LoginDTO;
-import com.lifetrack.dto.RegisterDTO;
-import com.lifetrack.dto.UpdateProfileDTO;
+import com.lifetrack.dto.*;
 import com.lifetrack.service.AuthService;
 import com.lifetrack.vo.LoginVO;
 import com.lifetrack.vo.UserProfileVO;
@@ -48,6 +46,29 @@ public class AuthController {
                                        Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
         authService.updateProfile(userId, dto);
+        return Result.success();
+    }
+
+    @Operation(summary = "忘记密码 — 发送重置邮件")
+    @PostMapping("/auth/forgot-password")
+    public Result<Void> forgotPassword(@RequestBody @Valid ForgotPasswordDTO dto) {
+        authService.forgotPassword(dto);
+        return Result.success();
+    }
+
+    @Operation(summary = "重置密码")
+    @PostMapping("/auth/reset-password")
+    public Result<Void> resetPassword(@RequestBody @Valid ResetPasswordDTO dto) {
+        authService.resetPassword(dto);
+        return Result.success();
+    }
+
+    @Operation(summary = "修改密码")
+    @PutMapping("/user/password")
+    public Result<Void> changePassword(@RequestBody @Valid ChangePasswordDTO dto,
+                                        Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        authService.changePassword(userId, dto);
         return Result.success();
     }
 }

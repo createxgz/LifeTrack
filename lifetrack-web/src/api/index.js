@@ -35,12 +35,15 @@ http.interceptors.response.use(
 
 export const authApi = {
   login: (data) => http.post('/auth/login', data),
-  register: (data) => http.post('/auth/register', data)
+  register: (data) => http.post('/auth/register', data),
+  forgotPassword: (email) => http.post('/auth/forgot-password', { email }),
+  resetPassword: (data) => http.post('/auth/reset-password', data)
 }
 
 export const userApi = {
   getProfile: () => http.get('/user/profile'),
-  updateProfile: (data) => http.put('/user/profile', data)
+  updateProfile: (data) => http.put('/user/profile', data),
+  changePassword: (data) => http.put('/user/password', data)
 }
 
 export default http

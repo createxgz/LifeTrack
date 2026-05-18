@@ -18,12 +18,12 @@ spring:
 
   mail:
     host: smtp.qq.com
-    port: 587
-    username: ${MAIL_USERNAME:your-email@qq.com}
-    password: ${MAIL_PASSWORD:your-auth-code}
+    port: 465
+    username: SMTP_USERNAME_REMOVED
+    password: SMTP_PASSWORD_REMOVED
     properties:
       mail.smtp.auth: true
-      mail.smtp.starttls.enable: true
+      mail.smtp.ssl.enable: true
 
   quartz:
     job-store-type: memory
